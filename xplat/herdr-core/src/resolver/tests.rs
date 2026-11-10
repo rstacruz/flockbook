@@ -430,12 +430,27 @@ fn omp_root(agent_dir: &str) -> String {
 #[test]
 fn omp_session_dir_names() {
     let root = "/h/.omp/agent/sessions";
-    let name = |cwd: &str| omp_session_dir(cwd, root, "/home/rsc", "/tmp");
+    let name = |cwd: &str| omp_session_dir(cwd, root, "/home/rsc", "/t");
     assert_eq!(name("/home/rsc/Dev/x"), format!("{root}/-Dev-x"), "home-relative");
     assert_eq!(name("/home/rsc/.dotfiles"), format!("{root}/-.dotfiles"), "a dot folder keeps its dot");
     assert_eq!(name("/home/rsc"), format!("{root}/-"), "the home folder itself: the bare prefix");
-    assert_eq!(name("/tmp/foo"), format!("{root}/-tmp-foo"), "the temp root is tried first");
+    assert_eq!(name("/t/foo"), format!("{root}/-tmp-foo"), "the temp root is tried first");
     assert_eq!(name("/opt/x:y"), format!("{root}/--opt-x-y--"), "elsewhere: the absolute form, ':' encoded too");
+}
+
+#[cfg(unix)]
+#[test]
+fn omp_session_dir_resolves_symlinks() {
+    let t = tempfile::tempdir().unwrap();
+    let real = t.path().join("real");
+    fs::create_dir_all(real.join("proj")).unwrap();
+    let link = t.path().join("link");
+    std::os::unix::fs::symlink(&real, &link).unwrap();
+    assert_eq!(
+        omp_session_dir(&link.join("proj").to_string_lossy(), "/s", "/home/rsc", &link.to_string_lossy()),
+        "/s/-tmp-proj",
+        "realpath both sides, as omp does"
+    );
 }
 
 #[test]

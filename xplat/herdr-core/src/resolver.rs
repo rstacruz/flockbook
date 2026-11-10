@@ -1219,9 +1219,19 @@ pub fn pi_session_dir(cwd: &str, agent_dir: &str) -> String {
 /// omp's session folder for a cwd (`session-paths.ts::getDefaultSessionDirName`, v18). Temp root first, then home,
 /// else the legacy absolute form. `home`/`temp_root` are the machine the files are on.
 pub fn omp_session_dir(cwd: &str, sessions_root: &str, home: &str, temp_root: &str) -> String {
+    // omp resolves both sides through realpath (`resolveEquivalentPath`); /tmp is /private/tmp on macOS.
+    fn resolved(p: &str, home: &str) -> String {
+        #[cfg(unix)]
+        {
+            if let Ok(real) = std::fs::canonicalize(p) {
+                return real.to_string_lossy().into_owned();
+            }
+        }
+        standardize_path_in(p, home)
+    }
     fn rel(root: &str, target: &str, home: &str) -> Option<String> {
-        let root = standardize_path_in(root, home);
-        let target = standardize_path_in(target, home);
+        let root = resolved(root, home);
+        let target = resolved(target, home);
         if target == root {
             return Some(String::new());
         }
@@ -1233,7 +1243,7 @@ pub fn omp_session_dir(cwd: &str, sessions_root: &str, home: &str, temp_root: &s
     } else if let Some(r) = rel(home, cwd, home) {
         encode_omp("-", &r)
     } else {
-        format!("--{}--", standardize_path_in(cwd, home).trim_start_matches('/').replace(['/', '\\', ':'], "-"))
+        format!("--{}--", resolved(cwd, home).trim_start_matches('/').replace(['/', '\\', ':'], "-"))
     };
     format!("{sessions_root}/{name}")
 }
