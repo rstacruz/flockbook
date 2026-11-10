@@ -32,6 +32,22 @@ fn default_dirs() {
     assert_eq!(default_dir("cursor", &g), home_dir() + "/.cursor/projects");
     assert_eq!(default_dir("claude", &g), home_dir() + "/.claude/projects");
     assert_eq!(default_dir("pi", &g), home_dir() + "/.claude/projects");
+    assert_eq!(default_dir("omp", &g), home_dir() + "/.omp/agent/sessions");
+}
+
+// omp: locate `<timestamp>_<id>.jsonl` under a cwd's folder.
+#[test]
+fn locate_omp_by_id() {
+    let t = tempfile::tempdir().unwrap();
+    let root = s(t.path());
+    let sid = "01a1c462-6379-729f-9155-111158f9d371";
+    fs::create_dir_all(format!("{root}/-w-omp")).unwrap();
+    let f = format!("{root}/-w-omp/2026-11-10T07-35-44-761Z_{sid}.jsonl");
+    fs::write(&f, "{}\n").unwrap();
+    assert_eq!(locate_omp(sid, &root).map(|p| s(&p)), Some(f.clone()), "omp locate by id");
+    assert_eq!(locate("omp", sid, &root).map(|p| s(&p)), Some(f.clone()));
+    assert_eq!(locate_omp("../x", &root), None, "omp locate rejects ..");
+    assert_eq!(locate("omp", &f, "/nonexistent").map(|p| s(&p)), Some(f), "an absolute path is the log");
 }
 
 // ChecksCore checksLocateTail (locate part).

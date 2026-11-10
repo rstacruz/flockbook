@@ -102,6 +102,7 @@ fn known_kind(w: &str) -> Option<&'static str> {
         "claude" => "claude",
         "codex" => "codex",
         "pi" => "pi",
+        "omp" => "omp",
         "cursor-agent" | "cursor" => "cursor",
         "gemini" => "gemini",
         "opencode" => "opencode",
@@ -246,6 +247,10 @@ mod tests {
         assert_eq!(process(&t, Some("claude")), None);
         let t = Term::parse(&json!({"address":"t3","argv":["zsh"],"pid":11,"foreground":{"name":"claude","argv":["claude"],"pid":13}})).unwrap();
         assert_eq!(process(&t, Some("claude")).as_deref(), Some("13@0"));
+        // omp: the foreground argv names it, so the chat's key gate has an identity.
+        let t = Term::parse(&json!({"address":"t6","argv":["zsh"],"pid":14,"created_ms":7,"foreground":{"name":"omp","argv":["omp","--resume","01a1c462"],"pid":15}})).unwrap();
+        assert_eq!(kind(&t).as_deref(), Some("omp"));
+        assert_eq!(process(&t, Some("omp")).as_deref(), Some("15@7"));
         // agy by its 7501 app name only.
         let t = Term::parse(&json!({"address":"t4","argv":["sh"],"status":{"state":"blocked","kind":"permission","app":"antigravity"}})).unwrap();
         let a = agent(&t).unwrap();

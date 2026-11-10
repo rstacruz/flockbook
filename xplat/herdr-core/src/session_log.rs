@@ -1,4 +1,5 @@
-//! Finds and tails an agent's JSONL session log (Claude Code, Codex, Cursor, pi, Grok Build). Port of `SessionLog.swift`.
+//! Finds and tails an agent's JSONL session log (Claude Code, Codex, Cursor, pi, omp, Grok Build). Port of
+//! `SessionLog.swift`.
 //!
 //! The tailer runs on its own thread and hands out `Snapshot`s over a channel. A file watcher (the `notify` crate)
 //! wakes it at once when the log directory changes; a timer is the safety net. Dropping the stream stops the thread.
@@ -155,8 +156,8 @@ pub fn default_dir(agent: &str) -> PathBuf {
 }
 
 /// Where an agent keeps its logs. Grok Build: `$GROK_HOME/sessions`, else `~/.grok/sessions`; Codex
-/// `~/.codex/sessions`; Cursor `~/.cursor/projects`; everything else (pi too) `~/.claude/projects`. As Swift: no
-/// `CODEX_HOME` / `CLAUDE_CONFIG_DIR` here.
+/// `~/.codex/sessions`; Cursor `~/.cursor/projects`; omp `~/.omp/agent/sessions`; everything else (pi too)
+/// `~/.claude/projects`. As Swift: no `CODEX_HOME` / `CLAUDE_CONFIG_DIR` here.
 pub fn default_dir_in(agent: &str, env: &HashMap<String, String>, home: &Path) -> PathBuf {
     let home = dir_str(home);
     if agent == "grok" {
@@ -168,6 +169,7 @@ pub fn default_dir_in(agent: &str, env: &HashMap<String, String>, home: &Path) -
         home + match agent {
             "codex" => "/.codex/sessions",
             "cursor" => "/.cursor/projects",
+            "omp" => "/.omp/agent/sessions",
             _ => "/.claude/projects",
         },
     )
@@ -193,6 +195,7 @@ pub fn locate(agent: &str, session_id: &str, dir: impl AsRef<Path>) -> Option<Pa
         "codex" => locate_codex(session_id, dir),
         "cursor" => locate_cursor(session_id, dir),
         "grok" => locate_grok(session_id, dir),
+        "omp" => locate_omp(session_id, dir),
         _ => locate_claude(session_id, dir), // Claude Code (and, as before, any other id)
     }
 }
@@ -250,6 +253,23 @@ pub fn locate_grok(session_id: &str, sessions_dir: impl AsRef<Path>) -> Option<P
         .map(|d| format!("{sessions_dir}/{d}/{session_id}/updates.jsonl"))
         .find(|p| file_exists(p))
         .map(PathBuf::from)
+}
+
+/// omp: `<sessions>/<cwd slug>/<timestamp>_<id>.jsonl`.
+pub fn locate_omp(session_id: &str, sessions_dir: impl AsRef<Path>) -> Option<PathBuf> {
+    if !id_ok(session_id) {
+        return None;
+    }
+    let root = dir_str(sessions_dir.as_ref());
+    let suffix = format!("_{session_id}.jsonl");
+    for d in list_dir(&root) {
+        for f in list_dir(&format!("{root}/{d}")) {
+            if f.ends_with(&suffix) {
+                return Some(PathBuf::from(format!("{root}/{d}/{f}")));
+            }
+        }
+    }
+    None
 }
 
 /// Claude Code: `<projects>/*/<id>.jsonl`, followed to the newest log of its conversation (see [`continued`]).

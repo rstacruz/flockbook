@@ -82,6 +82,9 @@ fn session_fallback_pure_parts() {
         log_path(std::slice::from_ref(&ro), "claude", None, &h).is_none() && log_path(&[format!("{h}/.claude/projects/x/id.jsonl")], "claude", None, &h).is_some(),
         "log kind per agent"
     );
+    let omp_log = format!("{h}/.omp/agent/sessions/-w-proj/2026-10-10T06-00-00-000Z_abc.jsonl");
+    assert_eq!(log_path(&[omp_log.clone()], "omp", None, &h), Some(omp_log.clone()), "omp: an open session log under ~/.omp");
+    assert!(log_path(&[omp_log], "claude", None, &h).is_none(), "omp: not a Claude log");
     assert!(
         is_claimed(&ro, &set(&["abc"])) && is_claimed(&ro, &set(&[&ro])) && !is_claimed(&ro, &set(&["bc"])) && !is_claimed(&ro, &set(&[])),
         "claimed by id or path"
@@ -416,6 +419,152 @@ fn hc_resolver_new_program() {
     let b = vec![proc_(930_002, 1, second, "node /opt/homebrew/bin/pi HC_TERMINAL_ID=t7")];
     let again = r.resolve_with(&[Need::new("hc:t7", "pi", cwd, vec![930_002])], &set(&[]), &HashMap::new(), Some(&b));
     assert_eq!(again.get("hc:t7"), Some(&two), "a new pid in the pane -> its log at once, not the old one");
+}
+
+// MARK: omp sessions
+
+fn omp_root(agent_dir: &str) -> String {
+    format!("{agent_dir}/sessions")
+}
+
+#[test]
+fn omp_session_dir_names() {
+    let root = "/h/.omp/agent/sessions";
+    let name = |cwd: &str| omp_session_dir(cwd, root, "/home/rsc", "/tmp");
+    assert_eq!(name("/home/rsc/Dev/x"), format!("{root}/-Dev-x"), "home-relative");
+    assert_eq!(name("/home/rsc/.dotfiles"), format!("{root}/-.dotfiles"), "a dot folder keeps its dot");
+    assert_eq!(name("/home/rsc"), format!("{root}/-"), "the home folder itself: the bare prefix");
+    assert_eq!(name("/tmp/foo"), format!("{root}/-tmp-foo"), "the temp root is tried first");
+    assert_eq!(name("/opt/x:y"), format!("{root}/--opt-x-y--"), "elsewhere: the absolute form, ':' encoded too");
+}
+
+#[test]
+fn omp_session() {
+    let (_t, agent_dir) = tmp();
+    let cwd = "/w/omp-proj";
+    let sessions = omp_root(&agent_dir);
+    let dir = omp_session_dir(cwd, &sessions, &home_dir(), "/nonexistent-tmp");
+    fs::create_dir_all(&dir).unwrap();
+    let start = Utc::now() - Duration::seconds(600);
+    let file = |name: &str, started: Date, c: &str, modified: Date| {
+        let p = format!("{dir}/{name}.jsonl");
+        fs::write(&p, pi_head(name, started, c) + "\n").unwrap();
+        set_mtime(&p, modified);
+        p
+    };
+    let s = |n: i64| start + Duration::seconds(n);
+    let old = file("old", s(-3600), cwd, s(-3000));
+    let mine = file("mine", s(3), cwd, s(60));
+    file("elsewhere", s(5), "/w/other", s(90));
+    let taken = file("taken", s(4), cwd, s(120));
+
+    let procs = vec![proc_(910_101, 1, start, "omp --resume 01a1c462")];
+    let need = Need::new("hc:to", "omp", cwd, vec![910_101]);
+    let resolve = |claimed: &[&str]| {
+        let mut r = resolver(|r| {
+            r.omp_agent_dir = agent_dir.clone();
+            r.omp_temp_dir = "/nonexistent-tmp".into();
+        });
+        r.resolve_with(std::slice::from_ref(&need), &set(claimed), &HashMap::new(), Some(&procs)).get("hc:to").cloned()
+    };
+    assert_eq!(resolve(&[&taken]), Some(mine.clone()), "the newest unclaimed file of its cwd started after the agent");
+    assert_eq!(resolve(&[]), Some(taken.clone()), "newest first when nothing is claimed (/new makes a newer file)");
+    fs::remove_file(&mine).unwrap();
+    fs::remove_file(&taken).unwrap();
+    assert_eq!(resolve(&[]), None, "an old file omp did not touch is not used");
+    set_mtime(&old, s(30));
+    assert_eq!(resolve(&[]), Some(old), "a resumed session (written after the agent started) is used");
+}
+
+#[test]
+fn omp_first_line_title_slot() {
+    let start = Utc::now() - Duration::seconds(600);
+    let s = |n: i64| start + Duration::seconds(n);
+    let header = pi_head("h1", s(2), "/r/w");
+    let slot = r#"{"type":"title","v":1,"title":"Title","source":"auto","updatedAt":"2026-10-10T06:00:00.000Z","pad":"   "}"#;
+    let titled = vec![("/r/titled.jsonl".to_string(), s(5), format!("{slot}\n{header}\n").into_bytes())];
+    assert_eq!(
+        pi_pick(&titled, "/r/w", start, &[], |_| false),
+        Some("/r/titled.jsonl".into()),
+        "omp: the header on the line after the title slot is found"
+    );
+    let plain = vec![("/r/plain.jsonl".to_string(), s(5), format!("{header}\n").into_bytes())];
+    assert_eq!(pi_pick(&plain, "/r/w", start, &[], |_| false), Some("/r/plain.jsonl".into()), "pi: a header on the first line is unchanged");
+}
+
+#[test]
+fn omp_two_in_one_cwd() {
+    let (_t, agent_dir) = tmp();
+    let cwd = "/w/omp-two";
+    let sessions = omp_root(&agent_dir);
+    let dir = omp_session_dir(cwd, &sessions, &home_dir(), "/nonexistent-tmp");
+    fs::create_dir_all(&dir).unwrap();
+    let a0 = Utc::now() - Duration::seconds(900);
+    let b0 = a0 + Duration::seconds(300);
+    let file = |id: &str, started: Date, modified: Date| {
+        let p = format!("{dir}/{id}.jsonl");
+        fs::write(&p, pi_head(id, started, cwd) + "\n").unwrap();
+        set_mtime(&p, modified);
+        p
+    };
+    let fa = file("a", a0 + Duration::seconds(1), b0 + Duration::seconds(100));
+    let fb = file("b", b0 + Duration::seconds(1), b0 + Duration::seconds(200));
+    let procs = vec![proc_(920_101, 1, a0, "omp --resume a"), proc_(920_102, 1, b0, "omp --resume b")];
+    let na = Need::new("hc:ta", "omp", cwd, vec![920_101]);
+    let nb = Need::new("hc:tb", "omp", cwd, vec![920_102]);
+    for order in [vec![na.clone(), nb.clone()], vec![nb.clone(), na.clone()]] {
+        let mut r = resolver(|r| {
+            r.omp_agent_dir = agent_dir.clone();
+            r.omp_temp_dir = "/nonexistent-tmp".into();
+        });
+        let got = r.resolve_with(&order, &set(&[]), &HashMap::new(), Some(&procs));
+        assert!(got.get("hc:ta") == Some(&fa) && got.get("hc:tb") == Some(&fb), "each pane gets its own omp's file ({got:?})");
+    }
+    fs::remove_file(&fa).unwrap();
+    let mut r = resolver(|r| {
+        r.omp_agent_dir = agent_dir.clone();
+        r.omp_temp_dir = "/nonexistent-tmp".into();
+    });
+    let got = r.resolve_with(&[na, nb], &set(&[]), &HashMap::new(), Some(&procs));
+    assert!(!got.contains_key("hc:ta") && got.get("hc:tb") == Some(&fb), "a later omp's file is not taken by the earlier one ({got:?})");
+    let lines = vec![
+        ("/r/a".to_string(), b0 + Duration::seconds(100), pi_head("a", a0 + Duration::seconds(1), cwd).into_bytes()),
+        ("/r/b".to_string(), b0 + Duration::seconds(200), pi_head("b", b0 + Duration::seconds(1), cwd).into_bytes()),
+    ];
+    assert!(
+        pi_pick(&lines, cwd, a0, &[b0], |_| false) == Some("/r/a".into()) && pi_pick(&lines, cwd, b0, &[a0], |_| false) == Some("/r/b".into()),
+        "pick with rivals"
+    );
+}
+
+#[test]
+fn omp_new_session_same_pid() {
+    let (_t, agent_dir) = tmp();
+    let cwd = "/w/omp-new";
+    let sessions = omp_root(&agent_dir);
+    let dir = omp_session_dir(cwd, &sessions, &home_dir(), "/nonexistent-tmp");
+    fs::create_dir_all(&dir).unwrap();
+    let file = |name: &str, started: Date| {
+        let p = format!("{dir}/{name}.jsonl");
+        fs::write(&p, pi_head(name, started, cwd) + "\n").unwrap();
+        set_mtime(&p, started + Duration::seconds(5));
+        p
+    };
+    let first = Utc::now() - Duration::seconds(600);
+    let second = Utc::now() - Duration::seconds(60);
+    let one = file("one", first + Duration::seconds(2));
+    let mut r = resolver(|r| {
+        r.omp_agent_dir = agent_dir.clone();
+        r.omp_temp_dir = "/nonexistent-tmp".into();
+    })
+    .with_intervals(0.0, 0.0);
+    let procs = vec![proc_(930_101, 1, first, "omp --resume 01a1")];
+    let need = Need::new("hc:to", "omp", cwd, vec![930_101]);
+    let found = r.resolve_with(std::slice::from_ref(&need), &set(&[]), &HashMap::new(), Some(&procs));
+    assert_eq!(found.get("hc:to"), Some(&one), "the first omp's file");
+    let two = file("two", second + Duration::seconds(2));
+    let again = r.resolve_with(&[need], &set(&[]), &HashMap::new(), Some(&procs));
+    assert_eq!(again.get("hc:to"), Some(&two), "/new in the same process is picked on the next recheck, not cached");
 }
 
 // MARK: checksGrok (resolver part)

@@ -13,7 +13,10 @@
 //! list open files (see `resolver/windows.rs`). The pure logic takes process lists as arguments, so checks inject
 //! them.
 
-use crate::session_log::{self, deleting_last_path_component, home_dir, is_abs_path, last_path_component, standardize_path};
+use crate::session_log::{
+    self, deleting_last_path_component, home_dir, is_abs_path, last_path_component, standardize_path,
+    standardize_path_in,
+};
 use crate::util::Date;
 use chrono::{DateTime, Duration, Local, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use serde_json::Value;
@@ -161,6 +164,10 @@ pub struct SessionResolver {
     pub projects_dir: String,
     pub claude_dir: String,
     pub pi_agent_dir: String,
+    /// omp's agent folder (`~/.omp/agent`); its sessions are in `sessions/` there.
+    pub omp_agent_dir: String,
+    /// The temp root omp's session folders are named after (`$TMPDIR`, else `/tmp`).
+    pub omp_temp_dir: String,
     pub agy_dir: String,
     /// The home folder the open-file route matches logs under (`~/.codex/sessions/`, `~/.claude/projects/`, ...).
     pub home: String,
@@ -246,8 +253,8 @@ fn file_number(_path: &str, _m: &std::fs::Metadata) -> u64 {
 
 impl SessionResolver {
     /// Defaults as in Swift: `~/.codex/sessions`, `~/.claude/projects`, `~/.claude/sessions`, `~/.pi/agent`,
-    /// `~/.gemini/antigravity-cli`; retry 5 s, recheck 30 s, verdict cap 8 MB; the host's processes and open files
-    /// ([`default_source`]).
+    /// `~/.omp/agent`, `~/.gemini/antigravity-cli`, the temp root; retry 5 s, recheck 30 s, verdict cap 8 MB; the
+    /// host's processes and open files ([`default_source`]).
     pub fn new(socket_path: &str) -> SessionResolver {
         let home = home_dir();
         let source: Arc<dyn ProcessSource> = Arc::from(default_source());
@@ -258,6 +265,8 @@ impl SessionResolver {
             projects_dir: session_log::default_dir("claude").to_string_lossy().into_owned(),
             claude_dir: home.clone() + "/.claude/sessions",
             pi_agent_dir: home.clone() + "/.pi/agent",
+            omp_agent_dir: home.clone() + "/.omp/agent",
+            omp_temp_dir: std::env::temp_dir().to_string_lossy().into_owned(),
             agy_dir: home.clone() + "/.gemini/antigravity-cli",
             home,
             retry: 5.0,
@@ -435,11 +444,13 @@ impl SessionResolver {
                     hc_agent_process(&n.pids, &n.kind, procs)
                 }
             };
-            // Two pi in one cwd: each one's start splits the folder's files between them.
-            let pi_starts: Vec<(String, String, Date)> = needs
+            // Two pi (or two omp) in one cwd: each one's start splits its folder's files between them.
+            let pi_starts: Vec<(String, String, String, Date)> = needs
                 .iter()
-                .filter(|n| n.kind == "pi")
-                .filter_map(|n| agent_of(n).map(|a| (n.pane_id.clone(), standardize_path(&n.cwd), a.start)))
+                .filter(|n| matches!(n.kind.as_str(), "pi" | "omp"))
+                .filter_map(|n| {
+                    agent_of(n).map(|a| (n.pane_id.clone(), n.kind.clone(), standardize_path(&n.cwd), a.start))
+                })
                 .collect();
             // Earliest agent first: it takes its file before a later one looks.
             let mut ordered: Vec<(&Need, Option<Proc>)> = due.iter().map(|n| (*n, agent_of(n))).collect();
@@ -451,12 +462,14 @@ impl SessionResolver {
             });
             for (n, agent) in ordered {
                 // agy: /new or /resume swaps the presence lock in the same process, so every recheck reads it again.
+                // omp: /new starts a new session file in the same process, so every recheck picks again.
                 if let Some(old) = self.cache.get(&n.pane_id) {
                     if let Some(path) = &old.path {
                         if old.pid.is_some()
                             && old.pid == agent.as_ref().map(|a| a.pid)
                             && !self.pid_file_changed(old)
                             && n.kind != "agy"
+                            && n.kind != "omp"
                             && (n.kind != "pi" || Path::new(path).exists())
                         {
                             let e = self.cache.get_mut(&n.pane_id).unwrap();
@@ -475,8 +488,11 @@ impl SessionResolver {
                     }
                 }
                 let cwd = standardize_path(&n.cwd);
-                let rivals: Vec<Date> =
-                    pi_starts.iter().filter(|(pane, c, _)| pane != &n.pane_id && c == &cwd).map(|(_, _, s)| *s).collect();
+                let rivals: Vec<Date> = pi_starts
+                    .iter()
+                    .filter(|(pane, kind, c, _)| pane != &n.pane_id && kind == &n.kind && c == &cwd)
+                    .map(|(_, _, _, s)| *s)
+                    .collect();
                 let found = agent.as_ref().map(|a| self.find(n, a, procs, &taken, claimed_cwd, &rivals));
                 let claude_hc = !n.pids.is_empty() && n.kind == "claude";
                 // Unresolved: watch the agent's own file, where a new session id would most likely appear.
@@ -558,9 +574,14 @@ impl SessionResolver {
                 _ => (None, None),
             };
         }
-        if n.kind == "pi" {
-            // pi keeps no file open: its cwd's session folder
-            let dir = pi_session_dir(&n.cwd, &self.pi_agent_dir);
+        if n.kind == "pi" || n.kind == "omp" {
+            // pi and omp: the cwd's session folder
+            let dir = if n.kind == "pi" {
+                pi_session_dir(&n.cwd, &self.pi_agent_dir)
+            } else {
+                let sessions = self.omp_agent_dir.clone() + "/sessions";
+                omp_session_dir(&n.cwd, &sessions, &self.home, &self.omp_temp_dir)
+            };
             let mut files: Vec<(String, Date, Vec<u8>)> = vec![];
             if let Ok(rd) = std::fs::read_dir(&dir) {
                 for f in rd.filter_map(|e| e.ok()).filter_map(|e| e.file_name().into_string().ok()) {
@@ -942,6 +963,7 @@ pub fn log_path(open_files: &[String], kind: &str, grok_home: Option<&str>, home
                 "codex" => p.starts_with(&(home.to_string() + "/.codex/sessions/")) && last_path_component(p).starts_with("rollout-"),
                 "cursor" => p.starts_with(&(home.to_string() + "/.cursor/projects/")) && p.contains("/agent-transcripts/"),
                 "pi" => p.starts_with(&(home.to_string() + "/.pi/")),
+                "omp" => p.starts_with(&(home.to_string() + "/.omp/")),
                 _ => p.starts_with(&(home.to_string() + "/.claude/projects/")),
             }
         })
@@ -1194,7 +1216,49 @@ pub fn pi_session_dir(cwd: &str, agent_dir: &str) -> String {
     format!("{agent_dir}/sessions/--{mapped}--")
 }
 
-/// pi's file among `(path, mtime, first line)`: a `session` header with this cwd, started or written at or after
+/// omp's session folder for a cwd (`session-paths.ts::getDefaultSessionDirName`, v18). Temp root first, then home,
+/// else the legacy absolute form. `home`/`temp_root` are the machine the files are on.
+pub fn omp_session_dir(cwd: &str, sessions_root: &str, home: &str, temp_root: &str) -> String {
+    fn rel(root: &str, target: &str, home: &str) -> Option<String> {
+        let root = standardize_path_in(root, home);
+        let target = standardize_path_in(target, home);
+        if target == root {
+            return Some(String::new());
+        }
+        let rest = target.strip_prefix(&(root.clone() + "/"))?;
+        Some(rest.to_string())
+    }
+    let name = if let Some(r) = rel(temp_root, cwd, home) {
+        encode_omp("-tmp", &r)
+    } else if let Some(r) = rel(home, cwd, home) {
+        encode_omp("-", &r)
+    } else {
+        format!("--{}--", standardize_path_in(cwd, home).trim_start_matches('/').replace(['/', '\\', ':'], "-"))
+    };
+    format!("{sessions_root}/{name}")
+}
+
+/// `/`, `\`, `:` become `-`; the prefix gains no second dash when it already ends in one.
+fn encode_omp(prefix: &str, relative: &str) -> String {
+    let encoded: String = relative.replace(['/', '\\', ':'], "-");
+    if encoded.is_empty() {
+        prefix.into()
+    } else if prefix.ends_with('-') {
+        format!("{prefix}{encoded}")
+    } else {
+        format!("{prefix}-{encoded}")
+    }
+}
+
+/// The `session` header among the first lines of `data` (omp puts a title slot before it). None while absent.
+fn session_header(data: &[u8]) -> Option<serde_json::Map<String, Value>> {
+    data.split(|b| *b == b'\n').take(4).find_map(|l| match serde_json::from_slice::<Value>(l) {
+        Ok(Value::Object(o)) if o.get("type").and_then(Value::as_str) == Some("session") => Some(o),
+        _ => None,
+    })
+}
+
+/// pi's file among `(path, mtime, first lines)`: a `session` header with this cwd, started or written at or after
 /// `after` (2 s slack), not claimed; the newest by mtime. `rivals`: start times of the other pi in this cwd; a header
 /// at or after a later rival's start is that rival's file.
 pub fn pi_pick(
@@ -1208,11 +1272,7 @@ pub fn pi_pick(
     let want = standardize_path(cwd);
     let lower = after - Duration::seconds(2);
     let ok = files.iter().filter(|(path, mtime, data)| {
-        let nl = data.iter().position(|b| *b == b'\n').unwrap_or(data.len());
-        let Ok(Value::Object(o)) = serde_json::from_slice::<Value>(&data[..nl]) else { return false };
-        if o.get("type").and_then(|v| v.as_str()) != Some("session") {
-            return false;
-        }
+        let Some(o) = session_header(data) else { return false };
         let Some(c) = o.get("cwd").and_then(|v| v.as_str()) else { return false };
         if standardize_path(c) != want {
             return false;
