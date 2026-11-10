@@ -1,6 +1,7 @@
-//! pi (`~/.pi/agent/sessions/<cwd-slug>/<time>_<uuid>.jsonl`). Entries form a tree by `id`/`parentId`; the shown
-//! conversation is the branch that ends at the newest entry. Lines are fed in file order; when an entry hangs off an
-//! earlier entry (an edited or retried turn), the items are rebuilt from that branch.
+//! pi (`~/.pi/agent/sessions/<cwd-slug>/<time>_<uuid>.jsonl`) and omp (the same shape and tree, with a `title` slot
+//! before the header). Entries form a tree by `id`/`parentId`; the shown conversation is the branch that ends at the
+//! newest entry. Lines are fed in file order; when an entry hangs off an earlier entry (an edited or retried turn),
+//! the items are rebuilt from that branch.
 
 use std::collections::HashMap;
 
@@ -20,7 +21,9 @@ pub struct PiState {
     replaying: bool,
 }
 
-pub const PI_TYPES: [&str; 10] = [
+/// pi's and omp's entry types. omp adds `title` (first-line slot, no id), and `title_change`/`model_usage`
+/// (tree entries that render nothing but must keep the parent chain whole).
+pub const PI_TYPES: [&str; 13] = [
     "session",
     "message",
     "model_change",
@@ -31,6 +34,9 @@ pub const PI_TYPES: [&str; 10] = [
     "compaction",
     "context_edit",
     "branch_summary",
+    "title",
+    "title_change",
+    "model_usage",
 ];
 
 pub fn pi_renders(o: &Obj) -> bool {

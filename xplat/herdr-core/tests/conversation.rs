@@ -236,6 +236,52 @@ fn pi_tree() {
 }
 
 #[test]
+fn omp_session() {
+    let ol = fixture_lines("omp.jsonl");
+    let before = parse(&ol[..17]);
+    assert_eq!(
+        describe(&before),
+        ["user:List the files.", "asst:Looking.", "chips:Ran a command|Read a file|Edited a file", "asst:Done with a.txt.", "user:Say something wrong.", "status"],
+        "omp: items before the branch"
+    );
+    assert!(matches!(&before.last().unwrap().kind, ItemKind::Status(s) if s == "Error: Rate limited."), "omp: error stop as status");
+    let items = parse(&ol);
+    assert_eq!(
+        describe(&items),
+        [
+            "user:List the files.",
+            "asst:Looking.",
+            "chips:Ran a command|Read a file|Edited a file",
+            "asst:Done with a.txt.",
+            "user:Run pwd yourself.",
+            "chips:Ran a command",
+            "asst:Building.",
+            "perm:make",
+        ],
+        "omp: newest branch only, through the title_change entries"
+    );
+    let chips = |i: usize| match &items[i].kind {
+        ItemKind::ToolChips(c) => c.clone(),
+        _ => vec![],
+    };
+    let calls: Vec<_> = chips(2).into_iter().flat_map(|c| c.calls).collect();
+    assert_eq!(calls.iter().map(|c| c.tool_name.as_str()).collect::<Vec<_>>(), ["Bash", "Read", "Edit"]);
+    assert_eq!(calls.iter().map(|c| c.output.as_deref().unwrap()).collect::<Vec<_>>(), ["a.txt", "hello", "no match"]);
+    assert_eq!(calls.iter().map(|c| c.is_error).collect::<Vec<_>>(), [false, false, true]);
+    let c5 = &chips(5)[0].calls[0];
+    assert!(c5.output.as_deref() == Some("/tmp/demo") && c5.summary == "pwd", "omp: user ! command as a chip");
+    assert!(!items.iter().any(|i| matches!(&i.kind, ItemKind::AssistantText(t) if t.contains("Hidden"))), "omp: thinking hidden");
+    let ids: Vec<_> = items.iter().map(|i| i.id.clone()).collect();
+    assert!(ids == parse(&ol).iter().map(|i| i.id.clone()).collect::<Vec<_>>() && items[0].id == "u1-0", "omp: stable ids from entry ids");
+    assert!(!ids.iter().any(|i| ["tc1", "tc2", "mu1", "mu2"].contains(&i.as_str())), "omp: title_change and model_usage render nothing");
+    let mut p = ConversationParser::new();
+    for l in &ol {
+        p.feed(l);
+    }
+    assert!(p.has_open_tool_use() && p.items().iter().map(|i| i.id.clone()).collect::<Vec<_>>() == ids, "omp: incremental feed = batch, open tool call");
+}
+
+#[test]
 fn cursor_transcript() {
     let cl = fixture_lines("cursor.jsonl");
     let items = parse(&cl);
