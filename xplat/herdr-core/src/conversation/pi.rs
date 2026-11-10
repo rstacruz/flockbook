@@ -77,6 +77,21 @@ impl ConversationParser {
         }
         let Some(id) = json::str_(o.get("id")) else { return };
         let parent = json::str_(o.get("parentId"));
+        // omp's late usage entry points at the leaf that was active when it was written (`activeLeafId`), not at
+        // itself; a title generated off the current branch must not pull the view back to its parent.
+        let late_leaf = if json::str_(o.get("type")) == Some("model_usage") {
+            json::str_(o.get("activeLeafId")).filter(|l| self.pi.parent.contains_key(*l))
+        } else {
+            None
+        };
+        if let Some(leaf) = late_leaf {
+            if self.pi.last.as_deref() != Some(leaf) {
+                self.rebuild_pi(leaf);
+            }
+            self.pi.parent.insert(id.into(), parent.unwrap_or("").into());
+            self.pi.last = Some(leaf.into());
+            return;
+        }
         if !self.pi.replaying {
             if let (Some(parent), Some(last)) = (parent, self.pi.last.as_deref()) {
                 if parent != last && self.pi.parent.contains_key(parent) {
