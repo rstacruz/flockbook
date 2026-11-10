@@ -128,6 +128,9 @@ impl ConversationParser {
                     return;
                 }
                 let all = result_text(o.get("content"));
+                if super::is_injected(text::trim(&all)) {
+                    return; // omp's async results carry injected XML
+                }
                 let Some(first) = text::first_line(text::trim(&all)) else { return };
                 self.flush();
                 self.done.push(ConversationItem::new(id, ItemKind::Status(text::prefix(first, 160).into()), self.line_ts));

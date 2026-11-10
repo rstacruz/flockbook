@@ -19,7 +19,8 @@
 {"type":"message","id":"r3","parentId":"r2","timestamp":"2026-10-10T06:00:07.000Z","message":{"role":"toolResult","toolCallId":"c3","toolName":"edit","content":[{"type":"text","text":"no match"}],"details":{},"isError":true,"timestamp":7}}
 {"type":"message","id":"a3","parentId":"r3","timestamp":"2026-10-10T06:00:08.000Z","message":{"role":"assistant","content":[{"type":"text","text":"Done with a.txt."}],"api":"x","provider":"x","model":"x","usage":{"input":1,"output":1,"cacheRead":0,"cacheWrite":0,"reasoning":0,"totalTokens":2,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"stop","timestamp":8}}
 {"type":"custom","customType":"worked-for","data":{"ms":5000,"at":8},"id":"w1","parentId":"a3","timestamp":"2026-10-10T06:00:08.000Z"}
-{"type":"title_change","id":"tc2","parentId":"w1","timestamp":"2026-10-10T06:00:08.000Z","title":"Files listed"}
+{"type":"custom_message","customType":"async-result","content":"<system-notice>\nBackground job j1 has completed.","display":true,"id":"cm2","parentId":"w1","timestamp":"2026-10-10T06:00:08.500Z"}
+{"type":"title_change","id":"tc2","parentId":"cm2","timestamp":"2026-10-10T06:00:08.600Z","title":"Files listed"}
 {"type":"message","id":"u2","parentId":"tc2","timestamp":"2026-10-10T06:00:09.000Z","message":{"role":"user","content":[{"type":"text","text":"Say something wrong."}],"timestamp":9}}
 {"type":"message","id":"a4","parentId":"u2","timestamp":"2026-10-10T06:00:10.000Z","message":{"role":"assistant","content":[],"api":"x","provider":"x","model":"x","usage":{"input":1,"output":1,"cacheRead":0,"cacheWrite":0,"reasoning":0,"totalTokens":2,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"error","timestamp":10,"errorMessage":"Rate limited.\nRetry later."}}
 {"type":"model_usage","id":"mu2","parentId":"a4","timestamp":"2026-10-10T06:00:10.000Z","model":"x-1","usage":{"input":1,"output":0,"totalTokens":1}}

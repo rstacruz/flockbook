@@ -238,7 +238,7 @@ fn pi_tree() {
 #[test]
 fn omp_session() {
     let ol = fixture_lines("omp.jsonl");
-    let before = parse(&ol[..24]);
+    let before = parse(&ol[..25]);
     assert_eq!(
         describe(&before),
         ["user:List the files.", "asst:Looking.", "chips:Ran a command|Read a file|Edited a file", "asst:Done with a.txt.", "user:Say something wrong.", "status"],
