@@ -20,7 +20,7 @@ function sandbox() {
   mkdirSync(home); mkdirSync(app);
   return { root, home, app };
 }
-const run = (script, args, env) => spawnSync("/bin/sh", [script, ...args], { encoding: "utf8", env: { PATH: "/usr/bin:/bin", ...env } });
+const run = (script, args, env) => spawnSync("/bin/sh", [script, ...args], { encoding: "utf8", env: { PATH: `/usr/bin:/bin:${process.env.PATH}`, ...env } });
 
 test("without a helper it stops and says how to build one", () => {
   const s = sandbox();
@@ -83,7 +83,7 @@ function linuxZip(arch) {
     sums += `${sha(body)}  ${t}/flockbook-modfeed\n`;
   }
   writeFileSync(join(zip, "remote/SHA256SUMS"), sums);
-  const go = () => spawnSync("/bin/sh", [join(zip, "install.sh"), "--dry-run"], { encoding: "utf8", env: { PATH: `${fake}:/usr/bin:/bin`, HOME: s.home } });
+  const go = () => spawnSync("/bin/sh", [join(zip, "install.sh"), "--dry-run"], { encoding: "utf8", env: { PATH: `${fake}:/usr/bin:/bin:${process.env.PATH}`, HOME: s.home } });
   return { zip, go };
 }
 
