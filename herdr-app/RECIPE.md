@@ -222,9 +222,9 @@ per 900 ms, as Herdr's own); done is a check
     Linux (`remote/<target>/`); or build it from that repo with
     `(cd xplat && cargo build --release -p flockbook-modfeed)`. It reads each agent's session log
     (`~/.claude/projects/`, `~/.codex/sessions/`, `~/.grok/sessions/`, `~/.cursor/projects/`,
-    `~/.pi/agent/sessions/`, `~/.gemini/antigravity-cli/`) and talks to herdr-core (`hc`) to read
-    screens and send keys and text. Commands: `feed`, `status`, `card`, `approve`, `answer`,
-    `send`, `paste-image`, `helper`, `update-check`, one per `exec`, JSON Lines back
+    `~/.pi/agent/sessions/`, `~/.omp/agent/sessions/<cwd slug>/`, `~/.gemini/antigravity-cli/`) and
+    talks to herdr-core (`hc`) to read screens and send keys and text. Commands: `feed`, `status`,
+    `card`, `approve`, `answer`, `send`, `paste-image`, `helper`, `update-check`, one per `exec`, JSON Lines back
     (`herdr-app/docs/protocol.md` in that repo). Every call ends with `--home <herdr-app home>`, so
     the helper follows the same config.json. It keeps `<herdr-app home>/flockbook/cache.json`, `answered/` beside it, and pastes in
     `<herdr-app home>/flockbook/paste/`.
@@ -283,7 +283,7 @@ per 900 ms, as Herdr's own); done is a check
   A reply goes only to the agent and conversation the chat showed.
 - Esc goes to the terminal in the terminal window, so its title bar has the close button.
 - Built and tried on macOS only. The helper needs herdr-core running; agents it reads: Claude
-  Code, Codex, Grok Build, Cursor, pi, Antigravity CLI.
+  Code, Codex, Grok Build, Cursor, pi, oh-my-pi (omp), Antigravity CLI.
 
 ## Done when
 
