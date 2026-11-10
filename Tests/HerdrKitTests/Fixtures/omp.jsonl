@@ -3,7 +3,14 @@
 {"type":"model_change","id":"m1","parentId":null,"timestamp":"2026-10-10T06:00:01.000Z","provider":"x","modelId":"x-1"}
 {"type":"thinking_level_change","id":"t1","parentId":"m1","timestamp":"2026-10-10T06:00:01.000Z","thinkingLevel":"medium"}
 {"type":"message","id":"u1","parentId":"t1","timestamp":"2026-10-10T06:00:02.000Z","message":{"role":"user","content":[{"type":"text","text":"List the files."}],"timestamp":2}}
-{"type":"message","id":"a1","parentId":"u1","timestamp":"2026-10-10T06:00:03.000Z","message":{"role":"assistant","content":[{"type":"thinking","thinking":"Hidden plan.","thinkingSignature":"x"},{"type":"text","text":"Looking."},{"type":"toolCall","id":"c1","name":"bash","arguments":{"command":"ls"}}],"api":"x","provider":"x","model":"x","usage":{"input":1,"output":1,"cacheRead":0,"cacheWrite":0,"reasoning":0,"totalTokens":2,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"toolUse","timestamp":3}}
+{"type":"label","id":"lb1","parentId":"u1","timestamp":"2026-10-10T06:00:02.100Z","label":"demo"}
+{"type":"session_init","id":"si1","parentId":"lb1","timestamp":"2026-10-10T06:00:02.200Z"}
+{"type":"reset_boundary","id":"rb1","parentId":"si1","timestamp":"2026-10-10T06:00:02.300Z"}
+{"type":"mode_change","id":"mo1","parentId":"rb1","timestamp":"2026-10-10T06:00:02.400Z","mode":"plan"}
+{"type":"service_tier_change","id":"sv1","parentId":"mo1","timestamp":"2026-10-10T06:00:02.500Z","serviceTier":"default"}
+{"type":"ttsr_injection","id":"tt1","parentId":"sv1","timestamp":"2026-10-10T06:00:02.600Z"}
+{"type":"credential_pin","id":"cp1","parentId":"tt1","timestamp":"2026-10-10T06:00:02.700Z"}
+{"type":"message","id":"a1","parentId":"cp1","timestamp":"2026-10-10T06:00:03.000Z","message":{"role":"assistant","content":[{"type":"thinking","thinking":"Hidden plan.","thinkingSignature":"x"},{"type":"text","text":"Looking."},{"type":"toolCall","id":"c1","name":"bash","arguments":{"command":"ls"}}],"api":"x","provider":"x","model":"x","usage":{"input":1,"output":1,"cacheRead":0,"cacheWrite":0,"reasoning":0,"totalTokens":2,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"toolUse","timestamp":3}}
 {"type":"message","id":"r1","parentId":"a1","timestamp":"2026-10-10T06:00:04.000Z","message":{"role":"toolResult","toolCallId":"c1","toolName":"bash","content":[{"type":"text","text":"a.txt"}],"details":{},"isError":false,"timestamp":4}}
 {"type":"model_usage","id":"mu1","parentId":"r1","timestamp":"2026-10-10T06:00:04.000Z","model":"x-1","usage":{"input":1,"output":1,"totalTokens":2}}
 {"type":"title_change","id":"tc1","parentId":"mu1","timestamp":"2026-10-10T06:00:04.000Z","title":"List the files"}

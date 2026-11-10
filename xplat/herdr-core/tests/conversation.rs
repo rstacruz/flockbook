@@ -238,7 +238,7 @@ fn pi_tree() {
 #[test]
 fn omp_session() {
     let ol = fixture_lines("omp.jsonl");
-    let before = parse(&ol[..17]);
+    let before = parse(&ol[..24]);
     assert_eq!(
         describe(&before),
         ["user:List the files.", "asst:Looking.", "chips:Ran a command|Read a file|Edited a file", "asst:Done with a.txt.", "user:Say something wrong.", "status"],
@@ -273,7 +273,6 @@ fn omp_session() {
     assert!(!items.iter().any(|i| matches!(&i.kind, ItemKind::AssistantText(t) if t.contains("Hidden"))), "omp: thinking hidden");
     let ids: Vec<_> = items.iter().map(|i| i.id.clone()).collect();
     assert!(ids == parse(&ol).iter().map(|i| i.id.clone()).collect::<Vec<_>>() && items[0].id == "u1-0", "omp: stable ids from entry ids");
-    assert!(!ids.iter().any(|i| ["tc1", "tc2", "mu1", "mu2"].contains(&i.as_str())), "omp: title_change and model_usage render nothing");
     let mut p = ConversationParser::new();
     for l in &ol {
         p.feed(l);

@@ -21,9 +21,11 @@ pub struct PiState {
     replaying: bool,
 }
 
-/// pi's and omp's entry types. omp adds `title` (first-line slot, no id), and `title_change`/`model_usage`
-/// (tree entries that render nothing but must keep the parent chain whole).
-pub const PI_TYPES: [&str; 13] = [
+/// pi's and omp's entry types. omp adds `title` (first-line slot, no id) and the bookkeeping entries
+/// (`title_change`, `model_usage`, `label`, `session_init`, `reset_boundary`, `mode_change`,
+/// `service_tier_change`, `ttsr_injection`, `credential_pin`), which render nothing but must keep the parent chain
+/// whole.
+pub const PI_TYPES: [&str; 20] = [
     "session",
     "message",
     "model_change",
@@ -37,6 +39,13 @@ pub const PI_TYPES: [&str; 13] = [
     "title",
     "title_change",
     "model_usage",
+    "label",
+    "session_init",
+    "reset_boundary",
+    "mode_change",
+    "service_tier_change",
+    "ttsr_injection",
+    "credential_pin",
 ];
 
 pub fn pi_renders(o: &Obj) -> bool {
