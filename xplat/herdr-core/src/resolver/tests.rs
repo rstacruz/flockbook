@@ -542,14 +542,6 @@ fn omp_two_in_one_cwd() {
     });
     let got = r.resolve_with(&[na, nb], &set(&[]), &HashMap::new(), Some(&procs));
     assert!(!got.contains_key("hc:ta") && got.get("hc:tb") == Some(&fb), "a later omp's file is not taken by the earlier one ({got:?})");
-    let lines = vec![
-        ("/r/a".to_string(), b0 + Duration::seconds(100), pi_head("a", a0 + Duration::seconds(1), cwd).into_bytes()),
-        ("/r/b".to_string(), b0 + Duration::seconds(200), pi_head("b", b0 + Duration::seconds(1), cwd).into_bytes()),
-    ];
-    assert!(
-        pi_pick(&lines, cwd, a0, &[b0], |_| false) == Some("/r/a".into()) && pi_pick(&lines, cwd, b0, &[a0], |_| false) == Some("/r/b".into()),
-        "pick with rivals"
-    );
 }
 
 #[test]

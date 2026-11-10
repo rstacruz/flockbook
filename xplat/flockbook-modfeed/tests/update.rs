@@ -22,7 +22,7 @@ fn t() -> T {
     T { _tmp: tmp, release: root.join("latest.json"), home }
 }
 
-/// System tools first, then the host's (NixOS has no curl under /usr/bin).
+/// System tools first, then the host's (NixOS has no curl under /usr/bin)
 fn path() -> String {
     format!("/usr/bin:/bin:{}", std::env::var("PATH").unwrap_or_default())
 }

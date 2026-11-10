@@ -35,7 +35,6 @@ fn default_dirs() {
     assert_eq!(default_dir("omp", &g), home_dir() + "/.omp/agent/sessions");
 }
 
-// omp: locate `<timestamp>_<id>.jsonl` under a cwd's folder.
 #[test]
 fn locate_omp_by_id() {
     let t = tempfile::tempdir().unwrap();

@@ -1,7 +1,7 @@
-//! pi (`~/.pi/agent/sessions/<cwd-slug>/<time>_<uuid>.jsonl`) and omp (the same shape and tree, with a `title` slot
-//! before the header). Entries form a tree by `id`/`parentId`; the shown conversation is the branch that ends at the
-//! newest entry. Lines are fed in file order; when an entry hangs off an earlier entry (an edited or retried turn),
-//! the items are rebuilt from that branch.
+//! pi (`~/.pi/agent/sessions/<cwd-slug>/<time>_<uuid>.jsonl`) and omp (same shape, plus a `title` slot before the
+//! header). Entries form a tree by `id`/`parentId`; the shown conversation is the branch that ends at the newest
+//! entry. Lines are fed in file order; when an entry hangs off an earlier entry (an edited or retried turn), the
+//! items are rebuilt from that branch.
 
 use std::collections::HashMap;
 
@@ -21,10 +21,7 @@ pub struct PiState {
     replaying: bool,
 }
 
-/// pi's and omp's entry types. omp adds `title` (first-line slot, no id) and the bookkeeping entries
-/// (`title_change`, `model_usage`, `label`, `session_init`, `reset_boundary`, `mode_change`,
-/// `service_tier_change`, `ttsr_injection`, `credential_pin`), which render nothing but must keep the parent chain
-/// whole.
+/// pi and omp entry types; omp's extra entries render nothing but keep the parent chain
 pub const PI_TYPES: [&str; 20] = [
     "session",
     "message",
@@ -77,8 +74,7 @@ impl ConversationParser {
         }
         let Some(id) = json::str_(o.get("id")) else { return };
         let parent = json::str_(o.get("parentId"));
-        // omp's late usage entry points at the leaf that was active when it was written (`activeLeafId`), not at
-        // itself; a title generated off the current branch must not pull the view back to its parent.
+        // omp's model_usage points at `activeLeafId` (the live leaf), not at itself
         let late_leaf = if json::str_(o.get("type")) == Some("model_usage") {
             json::str_(o.get("activeLeafId")).filter(|l| self.pi.parent.contains_key(*l))
         } else {

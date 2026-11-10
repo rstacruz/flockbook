@@ -126,8 +126,7 @@ pub fn kind_of_argv(argv: &[String]) -> Option<String> {
     words.iter().take(2).find_map(|w| known_kind(w)).map(String::from)
 }
 
-/// Agent kind from the foreground process, then the start argv; last, the program's own 7501 `app` name (omp
-/// launched through a wrapper reports `fish` for the pid but `omp` for the app).
+/// Agent kind: foreground process, then start argv, then the 7501 `app` name
 pub fn kind(t: &Term) -> Option<String> {
     let mut fg = vec![t.fg_name.clone().unwrap_or_default()];
     fg.extend(t.fg_argv.iter().cloned());
@@ -244,11 +243,9 @@ mod tests {
         assert_eq!(process(&t, Some("claude")), None);
         let t = Term::parse(&json!({"address":"t3","argv":["zsh"],"pid":11,"foreground":{"name":"claude","argv":["claude"],"pid":13}})).unwrap();
         assert_eq!(process(&t, Some("claude")).as_deref(), Some("13@0"));
-        // omp: the foreground argv names it, so the chat's key gate has an identity.
         let t = Term::parse(&json!({"address":"t6","argv":["zsh"],"pid":14,"created_ms":7,"foreground":{"name":"omp","argv":["omp","--resume","01a1c462"],"pid":15}})).unwrap();
         assert_eq!(kind(&t).as_deref(), Some("omp"));
         assert_eq!(process(&t, Some("omp")).as_deref(), Some("15@7"));
-        // omp behind a wrapper: its 7501 app names it, and no process identity is guessed.
         let t = Term::parse(&json!({"address":"t7","argv":["/run/current-system/sw/bin/fish","-ic","exec omp"],"pid":16,"status":{"state":"working","app":"omp"},"foreground":{"name":"fish","pid":16}})).unwrap();
         let a = agent(&t).unwrap();
         assert_eq!(a.kind, "omp");

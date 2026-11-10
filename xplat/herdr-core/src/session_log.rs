@@ -255,7 +255,7 @@ pub fn locate_grok(session_id: &str, sessions_dir: impl AsRef<Path>) -> Option<P
         .map(PathBuf::from)
 }
 
-/// omp: `<sessions>/<cwd slug>/<timestamp>_<id>.jsonl`.
+/// omp: `<sessions>/<cwd slug>/<timestamp>_<id>.jsonl`
 pub fn locate_omp(session_id: &str, sessions_dir: impl AsRef<Path>) -> Option<PathBuf> {
     if !id_ok(session_id) {
         return None;
