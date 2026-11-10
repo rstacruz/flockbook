@@ -445,7 +445,7 @@ impl SessionResolver {
                 }
             };
             // Two pi (or two omp) in one cwd: each one's start splits its folder's files between them.
-            let pi_starts: Vec<(String, String, String, Date)> = needs
+            let folder_starts: Vec<(String, String, String, Date)> = needs
                 .iter()
                 .filter(|n| matches!(n.kind.as_str(), "pi" | "omp"))
                 .filter_map(|n| {
@@ -488,7 +488,7 @@ impl SessionResolver {
                     }
                 }
                 let cwd = standardize_path(&n.cwd);
-                let rivals: Vec<Date> = pi_starts
+                let rivals: Vec<Date> = folder_starts
                     .iter()
                     .filter(|(pane, kind, c, _)| pane != &n.pane_id && kind == &n.kind && c == &cwd)
                     .map(|(_, _, _, s)| *s)
@@ -1258,9 +1258,9 @@ fn session_header(data: &[u8]) -> Option<serde_json::Map<String, Value>> {
     })
 }
 
-/// pi's file among `(path, mtime, first lines)`: a `session` header with this cwd, started or written at or after
-/// `after` (2 s slack), not claimed; the newest by mtime. `rivals`: start times of the other pi in this cwd; a header
-/// at or after a later rival's start is that rival's file.
+/// pi's or omp's file among `(path, mtime, first lines)`: a `session` header with this cwd, started or written at or
+/// after `after` (2 s slack), not claimed; the newest by mtime. `rivals`: start times of the other agent of the same
+/// kind in this cwd; a header at or after a later rival's start is that rival's file.
 pub fn pi_pick(
     files: &[(String, Date, Vec<u8>)],
     cwd: &str,
