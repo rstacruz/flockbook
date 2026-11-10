@@ -82,7 +82,7 @@ impl T {
     fn run_as(&self, exe: &Path, kind: &str, args: &[&str]) -> Vec<Value> {
         let mut c = Command::new(exe);
         c.arg("phone").args(args).args(["--home", self.home.to_str().unwrap()]).env_clear();
-        c.env("PATH", "/usr/bin:/bin").env("HOME", &self.user).env("FAKE", &self.bin);
+        c.env("PATH", format!("/usr/bin:/bin:{}", std::env::var("PATH").unwrap_or_default())).env("HOME", &self.user).env("FAKE", &self.bin);
         c.env("FLOCKBOOK_PHONE_BIN", &self.bin).env("FLOCKBOOK_PHONE_SERVICE", kind).env("HC_SESSION", "fb-test-phone");
         let o = c.output().unwrap();
         let text = String::from_utf8(o.stdout).unwrap();

@@ -159,7 +159,8 @@ fn exec_there(run: &Run, home: &std::path::Path, sock: &str, uname: Option<(i32,
             c
         }
     };
-    c.current_dir(if in_root { std::path::Path::new("/") } else { home }).env_clear().env("HOME", home).env("HC_SOCKET", sock).env("PATH", "/usr/bin:/bin:/usr/sbin:/sbin");
+    c.current_dir(if in_root { std::path::Path::new("/") } else { home }).env_clear().env("HOME", home).env("HC_SOCKET", sock)
+        .env("PATH", format!("/usr/bin:/bin:/usr/sbin:/sbin:{}", std::env::var("PATH").unwrap_or_default()));
     match c.output() {
         Ok(o) => Ok(json!({"code": o.status.code(), "stdout": b64(&o.stdout), "stderr": b64(&o.stderr), "truncated": false, "timed_out": false, "ms": 1})),
         Err(_) => Err("spawn_failed".into()),

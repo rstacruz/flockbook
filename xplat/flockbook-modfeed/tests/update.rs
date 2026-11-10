@@ -22,6 +22,11 @@ fn t() -> T {
     T { _tmp: tmp, release: root.join("latest.json"), home }
 }
 
+/// System tools first, then the host's (NixOS has no curl under /usr/bin).
+fn path() -> String {
+    format!("/usr/bin:/bin:{}", std::env::var("PATH").unwrap_or_default())
+}
+
 impl T {
     fn publish(&self, tag: &str) {
         fs::write(&self.release, json!({"tag_name": tag, "name": "x"}).to_string()).unwrap();
@@ -37,7 +42,7 @@ impl T {
     }
     fn run(&self, version: Option<&str>, extra: &[&str]) -> Value {
         let mut c = Command::new(env!("CARGO_BIN_EXE_flockbook-modfeed"));
-        c.arg("update-check").args(["--home", self.home.to_str().unwrap()]).args(extra).env_clear().env("PATH", "/usr/bin:/bin");
+        c.arg("update-check").args(["--home", self.home.to_str().unwrap()]).args(extra).env_clear().env("PATH", path());
         c.env("FLOCKBOOK_UPDATE_URL", format!("file://{}", self.release.display()));
         if let Some(v) = version {
             c.env("FLOCKBOOK_UPDATE_VERSION", v);
@@ -175,7 +180,7 @@ fn remote_helper_never_runs_nothing_on_other_machines() {
             .args(args)
             .args(["--home", t.home.to_str().unwrap()])
             .env_clear()
-            .env("PATH", "/usr/bin:/bin")
+            .env("PATH", path())
             .env("HC_SOCKET", t.home.join("no-core.sock"))
             .output()
             .unwrap();
